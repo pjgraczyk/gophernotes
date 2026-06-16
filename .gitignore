@@ -1,3 +1,15 @@
 gophernotes
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
 .ipynb_checkpoints
 Untitled*.ipynb

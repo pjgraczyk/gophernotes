@@ -1,13 +1,13 @@
-package main
+package kernel
 
 import (
-	interp "github.com/cosmos72/gomacro/fast"
+	interp "github.com/pjgraczyk/gomacro/fast"
+
+	"github.com/gopherdata/gophernotes/internal/messaging"
 )
 
 type Completion struct {
-	class,
-	name,
-	typ string
+	class, name, typ string
 }
 
 type CompletionResponse struct {
@@ -15,19 +15,13 @@ type CompletionResponse struct {
 	completions []Completion
 }
 
-/************************************************************
-* entry function
-************************************************************/
-func handleCompleteRequest(ir *interp.Interp, receipt msgReceipt) error {
-	// Extract the data from the request.
+func handleCompleteRequest(ir *interp.Interp, receipt messaging.MsgReceipt) error {
 	reqcontent := receipt.Msg.Content.(map[string]interface{})
 	code := reqcontent["code"].(string)
 	cursorPos := int(reqcontent["cursor_pos"].(float64))
 
-	// autocomplete the code at the cursor position
 	prefix, matches, _ := ir.CompleteWords(code, cursorPos)
 
-	// prepare the reply
 	content := make(map[string]interface{})
 
 	if len(matches) == 0 {
