@@ -1,7 +1,9 @@
 package kernel
 
 import (
+	"fmt"
 	"reflect"
+	"strings"
 
 	basereflect "github.com/pjgraczyk/gomacro/base/reflect"
 	"github.com/pjgraczyk/gomacro/xreflect"
@@ -62,22 +64,63 @@ func (kernel *Kernel) autoRender(mimeType string, arg interface{}, typ xreflect.
 }
 
 func (kernel *Kernel) autoRenderResults(vals []interface{}, types []xreflect.Type) rendering.Data {
-	var nilcount int
-	var obj interface{}
-	var typ xreflect.Type
-	for i, val := range vals {
-		if kernel.canAutoRender(val, types[i]) {
-			obj = val
-			typ = types[i]
-		} else if val == nil {
-			nilcount++
-		}
-	}
-	if obj != nil && nilcount == len(vals)-1 {
-		return kernel.autoRender("", obj, typ)
-	}
-	if nilcount == len(vals) {
+	filtered := kernel.filterResults(vals, types)
+
+	if len(filtered) == 0 {
 		return rendering.Data{}
 	}
-	return rendering.MakeData(rendering.MIMETypeText, rendering.AnyToString(vals...))
+
+	if len(filtered) == 1 {
+		v := filtered[0]
+		if kernel.canAutoRender(v.val, v.typ) {
+			return kernel.autoRender("", v.val, v.typ)
+		}
+		return rendering.MakeData(rendering.MIMETypeText, formatValue(v.val, v.typ))
+	}
+
+	var buf strings.Builder
+	for i, v := range filtered {
+		if i > 0 {
+			buf.WriteString(", ")
+		}
+		buf.WriteString(formatValue(v.val, v.typ))
+	}
+	return rendering.MakeData(rendering.MIMETypeText, buf.String())
+}
+
+type resultEntry struct {
+	val interface{}
+	typ xreflect.Type
+}
+
+func (kernel *Kernel) filterResults(vals []interface{}, types []xreflect.Type) []resultEntry {
+	var filtered []resultEntry
+	hasMultipleReturns := len(vals) > 1
+
+	for i, val := range vals {
+		isErr := kernel.isErrorType(types[i])
+
+		if hasMultipleReturns && isErr && val == nil {
+			continue
+		}
+
+		filtered = append(filtered, resultEntry{val: val, typ: types[i]})
+	}
+
+	return filtered
+}
+
+func formatValue(val interface{}, typ xreflect.Type) string {
+	typeStr := "nil"
+	if typ != nil {
+		typeStr = typ.String()
+	}
+	return fmt.Sprintf("%v (%s)", val, typeStr)
+}
+
+func (kernel *Kernel) isErrorType(typ xreflect.Type) bool {
+	if typ == nil {
+		return false
+	}
+	return typ.String() == "error"
 }
